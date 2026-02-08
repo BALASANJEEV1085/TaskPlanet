@@ -19,7 +19,7 @@ const Feed = () => {
     const fetchPosts = async () => {
         try {
             setLoading(true);
-            let url = 'http://localhost:5000/api/posts';
+            let url = 'https://socialsplanet.onrender.com/api/posts';
 
             if (filter === 'Most Liked') {
                 url += '?sort=liked';

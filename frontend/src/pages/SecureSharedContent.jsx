@@ -20,7 +20,7 @@ const SecureSharedContent = () => {
     useEffect(() => {
         const fetchSharedContent = async () => {
             try {
-                const res = await axios.get(`http://localhost:5000/api/secure-share/${hash}`);
+                const res = await axios.get(`https://socialsplanet.onrender.com/api/secure-share/${hash}`);
                 setContent(res.data.data);
                 setContentType(res.data.type);
                 setLoading(false);

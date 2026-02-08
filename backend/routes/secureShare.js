@@ -23,7 +23,7 @@ router.post('/post', auth, async (req, res) => {
 
         // Generate secure encrypted hash
         const hash = generateSecureHash(postId, 'post');
-        const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/s/${hash}`;
+        const shareUrl = `${process.env.FRONTEND_URL || 'https://socialsplanet.netlify.app'}/s/${hash}`;
 
         res.json({
             success: true,
@@ -55,7 +55,7 @@ router.post('/user', auth, async (req, res) => {
 
         // Generate secure encrypted hash
         const hash = generateSecureHash(userId, 'user');
-        const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/s/${hash}`;
+        const shareUrl = `${process.env.FRONTEND_URL || 'https://socialsplanet.netlify.app'}/s/${hash}`;
 
         res.json({
             success: true,

@@ -20,7 +20,7 @@ const FollowList = () => {
         const fetchUsers = async () => {
             setLoading(true);
             try {
-                const res = await axios.get(`http://localhost:5000/api/users/${id}/${type}`);
+                const res = await axios.get(`https://socialsplanet.onrender.com/api/users/${id}/${type}`);
                 setUsers(res.data);
             } catch (err) {
                 console.error('Error fetching users', err);

@@ -16,7 +16,7 @@ const SearchResults = () => {
             if (!query) return;
             setLoading(true);
             try {
-                const res = await axios.get(`http://localhost:5000/api/posts/search?q=${query}`);
+                const res = await axios.get(`https://socialsplanet.onrender.com/api/posts/search?q=${query}`);
                 setPosts(res.data);
             } catch (err) {
                 console.error('Search error', err);

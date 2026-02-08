@@ -3,7 +3,7 @@
 
 const axios = require('axios');
 
-const BASE_URL = 'http://localhost:5000/api';
+const BASE_URL = 'https://socialsplanet.onrender.com/api';
 
 async function testAPIs() {
     console.log('Testing API Endpoints...\n');

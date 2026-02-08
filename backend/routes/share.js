@@ -64,7 +64,7 @@ router.post('/create', auth, async (req, res) => {
         await shareToken.save();
 
         // Generate shareable URL
-        const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/share/${token}`;
+        const shareUrl = `${process.env.FRONTEND_URL || 'https://socialsplanet.netlify.app'}/share/${token}`;
 
         res.json({
             success: true,

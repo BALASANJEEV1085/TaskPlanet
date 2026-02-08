@@ -48,7 +48,7 @@ const UserProfile = ({ userId }) => {
     const handleCreateShareLink = async () => {
         setShareLoading(true);
         try {
-            const res = await axios.post('http://localhost:5000/api/secure-share/user', {
+            const res = await axios.post('https://socialsplanet.onrender.com/api/secure-share/user', {
                 userId: userData._id || userData.id
             });
             setShareUrl(res.data.shareUrl);
@@ -65,7 +65,7 @@ const UserProfile = ({ userId }) => {
         const fetchUserData = async () => {
             setLoading(true);
             try {
-                const res = await axios.get(`http://localhost:5000/api/users/${id}`);
+                const res = await axios.get(`https://socialsplanet.onrender.com/api/users/${id}`);
                 setUserData(res.data.user);
                 setPosts(res.data.posts);
             } catch (err) {
@@ -144,7 +144,7 @@ const UserProfile = ({ userId }) => {
             const formData = new FormData();
             formData.append('profilePicture', croppedFile);
 
-            const res = await axios.put('http://localhost:5000/api/users/profile', formData, {
+            const res = await axios.put('https://socialsplanet.onrender.com/api/users/profile', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             setUser(res.data);
@@ -172,7 +172,7 @@ const UserProfile = ({ userId }) => {
 
     const handleFollow = async () => {
         try {
-            const res = await axios.post(`http://localhost:5000/api/users/follow/${id}`);
+            const res = await axios.post(`https://socialsplanet.onrender.com/api/users/follow/${id}`);
             const updatedUser = { ...currentUser, following: res.data.following };
             setUser(updatedUser);
             localStorage.setItem('user', JSON.stringify(updatedUser));

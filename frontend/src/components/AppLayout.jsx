@@ -108,7 +108,7 @@ const AppLayout = () => {
         if (!user) return '';
         if (user.avatar) {
             if (user.avatar.startsWith('http') || user.avatar.startsWith('data:')) return user.avatar;
-            return `http://localhost:5000/${user.avatar.replace(/\\/g, '/')}`;
+            return `https://socialsplanet.onrender.com/${user.avatar.replace(/\\/g, '/')}`;
         }
         return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`;
     };

@@ -44,7 +44,7 @@ const CreatePostModal = ({ open, onClose, onPostCreated }) => {
                 formData.append('image', image);
             }
 
-            const res = await axios.post('http://localhost:5000/api/posts', formData, {
+            const res = await axios.post('https://socialsplanet.onrender.com/api/posts', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }
