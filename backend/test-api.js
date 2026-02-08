@@ -13,7 +13,7 @@ async function testAPIs() {
         const res = await axios.get(`${BASE_URL}/posts`);
         console.log('✓ GET /api/posts - Working');
     } catch (err) {
-        console.log('✗ GET /api/posts - Failed:', err.message);
+        console.log('✗ GET /api/posts - Failed:', err.response ? err.response.data : err.message);
     }
 
     // Test 2: Search route

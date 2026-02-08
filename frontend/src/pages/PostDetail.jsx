@@ -171,8 +171,9 @@ const CommentItem = ({ comment, postId, onUpdate }) => {
     );
 };
 
-const PostDetail = () => {
-    const { id } = useParams();
+const PostDetail = ({ postId }) => {
+    const params = useParams();
+    const id = postId || params.id;
     const { user } = useContext(AuthContext);
     const [post, setPost] = useState(null);
     const [loading, setLoading] = useState(true);

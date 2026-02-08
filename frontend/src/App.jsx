@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -8,6 +8,8 @@ import SearchResults from './pages/SearchResults';
 import PostDetail from './pages/PostDetail';
 import UserProfile from './pages/UserProfile';
 import FollowList from './pages/FollowList';
+import SharedContent from './pages/SharedContent';
+import SecureSharedContent from './pages/SecureSharedContent';
 import AppLayout from './components/AppLayout';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
@@ -28,6 +30,12 @@ const App = () => {
       <Routes>
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
         <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/" />} />
+
+        {/* Public share route - no auth required */}
+        <Route path="/share/:token" element={<SharedContent />} />
+
+        {/* Encrypted secure share route - no auth required */}
+        <Route path="/s/:hash" element={<SecureSharedContent />} />
 
         <Route element={<AppLayout />}>
           <Route path="/" element={user ? <Feed /> : <Navigate to="/login" />} />

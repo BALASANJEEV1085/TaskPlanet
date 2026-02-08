@@ -19,7 +19,15 @@ const Feed = () => {
     const fetchPosts = async () => {
         try {
             setLoading(true);
-            const res = await axios.get('http://localhost:5000/api/posts');
+            let url = 'http://localhost:5000/api/posts';
+
+            if (filter === 'Most Liked') {
+                url += '?sort=liked';
+            } else if (filter === 'Most Commented') {
+                url += '?sort=commented';
+            }
+
+            const res = await axios.get(url);
             setPosts(res.data);
         } catch (err) {
             console.error('Error fetching posts', err);
@@ -31,7 +39,7 @@ const Feed = () => {
 
     useEffect(() => {
         fetchPosts();
-    }, [refreshKey]);
+    }, [refreshKey, filter]);
 
     const handlePostCreated = (newPost) => {
         setPosts([newPost, ...posts]);

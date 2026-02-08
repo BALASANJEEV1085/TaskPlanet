@@ -146,4 +146,19 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+// @route   GET api/users/username/:username
+// @desc    Get user profile by username
+router.get('/username/:username', async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username }).select('-password');
+        if (!user) return res.status(404).json({ msg: 'User not found' });
+
+        const posts = await Post.find({ user: user._id }).sort({ createdAt: -1 });
+        res.json({ user, posts });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
 module.exports = router;

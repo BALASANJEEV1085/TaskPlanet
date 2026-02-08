@@ -3,13 +3,37 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { authLimiter } = require('../middleware/rateLimiter');
 
 // @route   POST api/auth/signup
 // @desc    Register user
-router.post('/signup', async (req, res) => {
+router.post('/signup', authLimiter, async (req, res) => {
     const { username, email, password } = req.body;
 
     try {
+        // Input validation
+        if (!username || !email || !password) {
+            return res.status(400).json({ msg: 'Please provide all required fields' });
+        }
+
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ msg: 'Please provide a valid email address' });
+        }
+
+        // Username validation (alphanumeric, 3-20 chars)
+        const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+        if (!usernameRegex.test(username)) {
+            return res.status(400).json({ msg: 'Username must be 3-20 characters and contain only letters, numbers, and underscores' });
+        }
+
+        // Password strength validation (min 8 chars, 1 uppercase, 1 lowercase, 1 number)
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+        if (!passwordRegex.test(password)) {
+            return res.status(400).json({ msg: 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number' });
+        }
+
         let userByEmail = await User.findOne({ email });
         let userByName = await User.findOne({ username });
 
@@ -63,10 +87,21 @@ router.post('/signup', async (req, res) => {
 
 // @route   POST api/auth/login
 // @desc    Authenticate user & get token
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
     const { email, password } = req.body;
 
     try {
+        // Input validation
+        if (!email || !password) {
+            return res.status(400).json({ msg: 'Please provide email and password' });
+        }
+
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ msg: 'Invalid Credentials' });
+        }
+
         let user = await User.findOne({ email });
 
         if (!user) {

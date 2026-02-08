@@ -34,3 +34,17 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Security & Sensitive Files
+*.pem
+*.key
+*.cert
+.env.production
+.env.staging
+secrets/
+config/secrets.js
+
+# Uploads & User Data
+uploads/
+temp/
+*.tmp

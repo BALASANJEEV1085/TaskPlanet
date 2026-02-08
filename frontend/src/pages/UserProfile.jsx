@@ -19,14 +19,19 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import Slider from '@mui/material/Slider';
 
-const UserProfile = () => {
-    const { id } = useParams();
+const UserProfile = ({ userId }) => {
+    const params = useParams();
+    const id = userId || params.id;
     const { user: currentUser, setUser } = useContext(AuthContext);
     const [userData, setUserData] = useState(null);
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openEditModal, setOpenEditModal] = useState(false);
     const [openShareModal, setOpenShareModal] = useState(false);
+    const [shareUrl, setShareUrl] = useState('');
+    const [shareLoading, setShareLoading] = useState(false);
+    const [expiresInDays, setExpiresInDays] = useState(30);
+    const [maxAccess, setMaxAccess] = useState('');
     const navigate = useNavigate();
 
     // Cropping state
@@ -39,6 +44,22 @@ const UserProfile = () => {
 
     const isOwnProfile = currentUser?.id === id || currentUser?._id === id;
     const isFollowing = currentUser?.following?.some(followId => followId.toString() === id);
+
+    const handleCreateShareLink = async () => {
+        setShareLoading(true);
+        try {
+            const res = await axios.post('http://localhost:5000/api/secure-share/user', {
+                userId: userData._id || userData.id
+            });
+            setShareUrl(res.data.shareUrl);
+            toast.success('Encrypted share link created!');
+        } catch (err) {
+            console.error('Error creating share link:', err);
+            toast.error(err.response?.data?.msg || 'Failed to create share link');
+        } finally {
+            setShareLoading(false);
+        }
+    };
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -271,7 +292,14 @@ const UserProfile = () => {
                         </Button>
                     )}
 
-                    <IconButton onClick={() => setOpenShareModal(true)} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <IconButton
+                        onClick={() => {
+                            const url = `${window.location.origin}/user/${id}`;
+                            navigator.clipboard.writeText(url);
+                            toast.success('Profile link copied!');
+                        }}
+                        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+                    >
                         <ShareIcon fontSize="small" />
                     </IconButton>
                 </Box>
@@ -279,45 +307,7 @@ const UserProfile = () => {
 
             <Divider />
 
-
-
             <EditProfileModal open={openEditModal} onClose={() => setOpenEditModal(false)} />
-
-            <Dialog open={openShareModal} onClose={() => setOpenShareModal(false)} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold' }}>Share Profile</DialogTitle>
-                <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pb: 4, gap: 2 }}>
-                    <Box sx={{ p: 2, bgcolor: 'white', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                        <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${window.location.origin}/user/${id}`}
-                            alt="Profile QR Code"
-                            style={{ display: 'block', width: '200px', height: '200px' }}
-                        />
-                    </Box>
-                    <Typography variant="body2" color="text.secondary">Scan to visit profile</Typography>
-
-                    <Box sx={{ display: 'flex', width: '100%', gap: 1, mt: 1 }}>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            value={`${window.location.origin}/user/${id}`}
-                            InputProps={{
-                                readOnly: true,
-                            }}
-                        />
-                        <Button
-                            variant="contained"
-                            onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}/user/${id}`);
-                                toast.success('Link copied!');
-                                setOpenShareModal(false);
-                            }}
-                            startIcon={<ContentCopyIcon />}
-                        >
-                            Copy
-                        </Button>
-                    </Box>
-                </DialogContent>
-            </Dialog>
 
             <Dialog open={cropMode} onClose={handleCropCancel} fullWidth maxWidth="md">
                 <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>

@@ -2,7 +2,7 @@ import React, { useContext, useState } from 'react';
 import {
     Card, CardHeader, CardContent, CardActions,
     Avatar, IconButton, Typography, Box, Menu, MenuItem,
-    Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button
+    Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Stack
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -14,11 +14,17 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { formatDistanceToNow } from 'date-fns';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import TextField from '@mui/material/TextField';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 
 const PostCard = ({ post, onUpdate, onDelete }) => {
-    const { user, setUser } = useContext(AuthContext); // Access setUser to update local state on follow
+    const { user, setUser } = useContext(AuthContext);
     const navigate = useNavigate();
     const [anchorEl, setAnchorEl] = useState(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
     // Safety checks
     // Safety checks
@@ -29,7 +35,12 @@ const PostCard = ({ post, onUpdate, onDelete }) => {
         return likeUserId.toString() === (user?.id || user?._id);
     });
     const isFollowing = user?.following?.some(id => (id._id || id).toString() === (post.user?._id || post.user).toString());
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+    const handleSharePost = () => {
+        const shareUrl = `${window.location.origin}/post/${post._id}`;
+        navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!');
+    };
 
     const handleLike = async () => {
         try {
@@ -193,26 +204,20 @@ const PostCard = ({ post, onUpdate, onDelete }) => {
                 <Box sx={{ flexGrow: 1 }} />
 
                 <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
-                    <IconButton size="small" onClick={() => {
-                        window.history.pushState(null, null, `/post/${post._id}`);
-                        navigator.clipboard.writeText(window.location.href);
-                        toast.success('Link copied to clipboard');
-                    }}>
+                    <IconButton size="small" onClick={handleSharePost}>
                         <ShareIcon fontSize="small" />
                     </IconButton>
                 </Box>
             </CardActions>
+
+            {/* Delete Confirmation Dialog */}
             <Dialog
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}
-                aria-labelledby="alert-dialog-title"
-                aria-describedby="alert-dialog-description"
             >
-                <DialogTitle id="alert-dialog-title">
-                    {"Delete Post?"}
-                </DialogTitle>
+                <DialogTitle>Delete Post?</DialogTitle>
                 <DialogContent>
-                    <DialogContentText id="alert-dialog-description">
+                    <DialogContentText>
                         Are you sure you want to delete this post? This action cannot be undone.
                     </DialogContentText>
                 </DialogContent>
