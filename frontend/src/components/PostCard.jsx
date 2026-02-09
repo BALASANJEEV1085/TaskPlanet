@@ -44,7 +44,7 @@ const PostCard = ({ post, onUpdate, onDelete }) => {
 
     const handleLike = async () => {
         try {
-            const res = await axios.put(`https://socialsplanet.onrender.com/api/posts/like/${post._id}`);
+            const res = await axios.put(`http://localhost:5000/api/posts/like/${post._id}`);
             const updatedLikes = res.data;
             const updatedPost = { ...post, likes: updatedLikes };
             onUpdate(updatedPost);
@@ -60,7 +60,7 @@ const PostCard = ({ post, onUpdate, onDelete }) => {
 
     const handleConfirmDelete = async () => {
         try {
-            await axios.delete(`https://socialsplanet.onrender.com/api/posts/${post._id}`);
+            await axios.delete(`http://localhost:5000/api/posts/${post._id}`);
             if (onDelete) onDelete(post._id);
             toast.success('Post deleted');
         } catch (err) {
@@ -71,7 +71,7 @@ const PostCard = ({ post, onUpdate, onDelete }) => {
 
     const handleFollow = async () => {
         try {
-            const res = await axios.post(`https://socialsplanet.onrender.com/api/users/follow/${post.user._id}`);
+            const res = await axios.post(`http://localhost:5000/api/users/follow/${post.user._id}`);
 
             // Update local user context
             const updatedUser = { ...user, following: res.data.following };
@@ -91,7 +91,7 @@ const PostCard = ({ post, onUpdate, onDelete }) => {
         // If u is populated object
         if (typeof u === 'object' && u.avatar) {
             if (u.avatar.startsWith('http') || u.avatar.startsWith('data:')) return u.avatar;
-            return `https://socialsplanet.onrender.com/${u.avatar.replace(/\\/g, '/')}`;
+            return `http://localhost:5000/${u.avatar.replace(/\\/g, '/')}`;
         }
         // Fallback or string ID
         const seed = u.username || (typeof u === 'string' ? u : 'user');
@@ -178,7 +178,7 @@ const PostCard = ({ post, onUpdate, onDelete }) => {
                     <img
                         src={post.image.startsWith('http')
                             ? post.image
-                            : `https://socialsplanet.onrender.com/${post.image.replace(/\\/g, '/')}`}
+                            : `http://localhost:5000/${post.image.replace(/\\/g, '/')}`}
                         alt="Post content"
                         style={{ width: '100%', maxHeight: '500px', objectFit: 'cover', borderRadius: '12px' }}
                         onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/500?text=Image+Not+Found'; }}

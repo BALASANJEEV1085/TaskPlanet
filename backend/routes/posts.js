@@ -73,14 +73,12 @@ router.get('/search', async (req, res) => {
         const { q } = req.query;
         if (!q) return res.json([]);
 
-        const posts = await Post.find({
-            $or: [
-                { text: { $regex: q, $options: 'i' } },
-                { username: { $regex: q, $options: 'i' } }
-            ]
-        }).sort({ createdAt: -1 }).populate('user', 'username avatar');
+        const [users, posts] = await Promise.all([
+            User.find({ username: { $regex: q, $options: 'i' } }).select('username avatar bio'),
+            Post.find({ text: { $regex: q, $options: 'i' } }).populate('user', 'username avatar').sort({ createdAt: -1 })
+        ]);
 
-        res.json(posts);
+        res.json({ users, posts });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');

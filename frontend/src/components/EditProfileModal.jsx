@@ -127,7 +127,7 @@ const EditProfileModal = ({ open, onClose }) => {
                 formData.append('avatar', imagePreview);
             }
 
-            const res = await axios.put('https://socialsplanet.onrender.com/api/users/profile', formData, {
+            const res = await axios.put('http://localhost:5000/api/users/profile', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
@@ -163,7 +163,7 @@ const EditProfileModal = ({ open, onClose }) => {
                                     imagePreview
                                         ? (imagePreview.startsWith('http') || imagePreview.startsWith('blob:') || imagePreview.startsWith('data:')
                                             ? imagePreview
-                                            : `https://socialsplanet.onrender.com/${imagePreview.replace(/\\/g, '/')}`)
+                                            : `http://localhost:5000/${imagePreview.replace(/\\/g, '/')}`)
                                         : `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
                                 }
                                 sx={{

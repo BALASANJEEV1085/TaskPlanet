@@ -27,7 +27,7 @@ const CommentItem = ({ comment, postId, onUpdate }) => {
 
     const handleLike = async () => {
         try {
-            const res = await axios.put(`https://socialsplanet.onrender.com/api/posts/comment/${postId}/${comment._id}/like`);
+            const res = await axios.put(`http://localhost:5000/api/posts/comment/${postId}/${comment._id}/like`);
             onUpdate(res.data);
         } catch (err) {
             console.error('Error liking comment', err);
@@ -41,7 +41,7 @@ const CommentItem = ({ comment, postId, onUpdate }) => {
 
         setLoading(true);
         try {
-            const res = await axios.post(`https://socialsplanet.onrender.com/api/posts/comment/${postId}/${comment._id}/reply`, { text: replyText });
+            const res = await axios.post(`http://localhost:5000/api/posts/comment/${postId}/${comment._id}/reply`, { text: replyText });
             onUpdate(res.data);
             setReplyText('');
             setShowReplyInput(false);
@@ -58,7 +58,7 @@ const CommentItem = ({ comment, postId, onUpdate }) => {
         if (!u) return '';
         if (typeof u === 'object' && u.avatar) {
             if (u.avatar.startsWith('http') || u.avatar.startsWith('data:')) return u.avatar;
-            return `https://socialsplanet.onrender.com/${u.avatar}`;
+            return `http://localhost:5000/${u.avatar}`;
         }
         const seed = u.username || 'user';
         return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
@@ -184,7 +184,7 @@ const PostDetail = ({ postId }) => {
     useEffect(() => {
         const fetchPost = async () => {
             try {
-                const res = await axios.get(`https://socialsplanet.onrender.com/api/posts/${id}`);
+                const res = await axios.get(`http://localhost:5000/api/posts/${id}`);
                 setPost(res.data);
             } catch (err) {
                 console.error('Error fetching post', err);
@@ -201,7 +201,7 @@ const PostDetail = ({ postId }) => {
 
         setCommentLoading(true);
         try {
-            const res = await axios.post(`https://socialsplanet.onrender.com/api/posts/comment/${id}`, { text: commentText });
+            const res = await axios.post(`http://localhost:5000/api/posts/comment/${id}`, { text: commentText });
             setPost(prev => ({ ...prev, comments: res.data }));
             setCommentText('');
             toast.success('Comment added');
@@ -222,7 +222,7 @@ const PostDetail = ({ postId }) => {
         if (!u) return '';
         if (typeof u === 'object' && u.avatar) {
             if (u.avatar.startsWith('http') || u.avatar.startsWith('data:')) return u.avatar;
-            return `https://socialsplanet.onrender.com/${u.avatar}`;
+            return `http://localhost:5000/${u.avatar}`;
         }
         const seed = u.username || 'user';
         return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;

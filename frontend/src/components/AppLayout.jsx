@@ -72,9 +72,18 @@ const AppLayout = () => {
 
     const [refreshKey, setRefreshKey] = useState(0);
 
-    const handleSearch = (e) => {
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const handleSearch = () => {
+        if (searchQuery.trim()) {
+            navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+            setSearchQuery(''); // Optional: clear after search? Maybe not.
+        }
+    };
+
+    const handleKeyPress = (e) => {
         if (e.key === 'Enter') {
-            navigate(`/search?q=${e.target.value}`);
+            handleSearch();
         }
     };
 
@@ -108,7 +117,7 @@ const AppLayout = () => {
         if (!user) return '';
         if (user.avatar) {
             if (user.avatar.startsWith('http') || user.avatar.startsWith('data:')) return user.avatar;
-            return `https://socialsplanet.onrender.com/${user.avatar.replace(/\\/g, '/')}`;
+            return `http://localhost:5000/${user.avatar.replace(/\\/g, '/')}`;
         }
         return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`;
     };
@@ -144,9 +153,11 @@ const AppLayout = () => {
                                 <StyledInputBase
                                     placeholder="Search users, posts..."
                                     inputProps={{ 'aria-label': 'search' }}
-                                    onKeyPress={handleSearch}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyPress={handleKeyPress}
                                 />
-                                <SearchButton>
+                                <SearchButton onClick={handleSearch}>
                                     <SearchIcon fontSize="small" />
                                 </SearchButton>
                             </SearchContainer>

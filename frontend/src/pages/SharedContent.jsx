@@ -22,7 +22,7 @@ const SharedContent = () => {
     useEffect(() => {
         const fetchSharedContent = async () => {
             try {
-                const res = await axios.get(`https://socialsplanet.onrender.com/api/share/${token}`);
+                const res = await axios.get(`http://localhost:5000/api/share/${token}`);
                 setContent(res.data.data);
                 setShareInfo({
                     accessCount: res.data.accessCount,
