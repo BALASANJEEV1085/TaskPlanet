@@ -1,18 +1,17 @@
-name: Build and Deploy TaskPlanet to EC2/Docker
+name: Deploy TaskPlanet to EC2 Docker
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 env:
   AWS_REGION: ap-south-1
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   ECR_REGISTRY: 759204735992.dkr.ecr.ap-south-1.amazonaws.com
   ECR_REPOSITORY: taskplanet
   INSTANCE_ID: i-0c56eb2e4cbe15fca
-  DOCKERFILE_PATH: .
+  PUBLIC_URL: http://65.0.253.152
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   build-and-deploy:
@@ -21,73 +20,137 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js for diagnostics
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build diagnostics - Node version
+        run: |
+          node --version
+          npm --version
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest -f ${{ env.DOCKERFILE_PATH }}/Dockerfile .
-
-      - name: Tag image with commit SHA
-        run: |
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:latest $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
-
       - name: Install AWS CLI
         run: |
-          curl -sL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip
-          unzip -q awscliv2.zip
-          sudo ./aws/install
+          pip install --quiet --upgrade pip
+          pip install --quiet awscli
 
-      - name: Deploy to EC2 via SSM
+      - name: Configure AWS credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          # Login to ECR and deploy using SSM Run Command
-          FULL_IMAGE="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
+          aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+          aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+          aws configure set region "${{ env.AWS_REGION }}"
 
-          # Write SSM parameters to file (avoids shell parsing issues)
+      - name: Login to Amazon ECR
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws ecr get-login-password --region "${{ env.AWS_REGION }}" | \
+          docker login --username AWS --password-stdin "${{ env.ECR_REGISTRY }}"
+
+      - name: Build and push Docker image
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64
+
+      - name: Build and push
+        run: |
+          IMAGE_URI="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+          docker build -t $IMAGE_URI -f Dockerfile .
+          docker push $IMAGE_URI
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Pull secrets from AWS Secrets Manager
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          SECRETS=$(aws secretsmanager get-secret-value --secret-id deptic/TaskPlanet/secrets --region "${{ env.AWS_REGION }}" --query SecretString --output text)
+          echo "$SECRETS" > /tmp/secrets.json
+          echo "Secrets fetched successfully"
+
+      - name: Send SSM command to deploy on EC2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          REGION="${{ env.AWS_REGION }}"
+          ECR_REGISTRY="${{ env.ECR_REGISTRY }}"
+          ECR_REPOSITORY="${{ env.ECR_REPOSITORY }}"
+          IMAGE_TAG="${{ env.IMAGE_TAG }}"
+          INSTANCE_ID="${{ env.INSTANCE_ID }}"
+          FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
           cat > /tmp/ssm-params.json << 'SSMPARAMS'
           {
             "commands": [
               "aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REGISTRY",
-              "docker pull $IMAGE_URI",
+              "docker pull $FULL_IMAGE",
               "docker stop app || true",
               "docker rm app || true",
-              "docker run -d --restart always -p 80:80 --name app -e PORT=5000 $IMAGE_URI"
-            ],
-            "workingDirectory": ["/"],
-            "executionTimeout": ["600"]
+              "docker run -d --restart always -p 80:80 --name app $FULL_IMAGE"
+            ]
           }
           SSMPARAMS
 
-          # Handle ECR_REGISTRY and IMAGE_URI environment variables for SSM
-          sed -i "s|\$REGION|${{ env.AWS_REGION }}|g" /tmp/ssm-params.json
-          sed -i "s|\$ECR_REGISTRY|${{ env.ECR_REGISTRY }}|g" /tmp/ssm-params.json
-          sed -i "s|\$IMAGE_URI|$FULL_IMAGE|g" /tmp/ssm-params.json
+          sed -i "s|\\\$REGION|$REGION|g; s|\\\$ECR_REGISTRY|$ECR_REGISTRY|g; s|\\\$FULL_IMAGE|$FULL_IMAGE|g" /tmp/ssm-params.json
 
-          # Send SSM command
           COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "${{ env.INSTANCE_ID }}" \
-            --region "${{ env.AWS_REGION }}" \
+            --instance-ids "$INSTANCE_ID" \
+            --region "$REGION" \
             --document-name "AWS-RunShellScript" \
             --parameters file:///tmp/ssm-params.json \
             --query "Command.CommandId" \
             --output text)
 
           echo "SSM Command ID: $COMMAND_ID"
-          echo "COMMAND_ID=$COMMAND_ID" >> $GITHUB_ENV
 
           # Wait for command to complete
-          sleep 30
+          for i in $(seq 1 12); do
+            sleep 10
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region "$REGION" \
+              --query "CommandInvocations[0].Status" \
+              --output text)
+            if [ "$STATUS" = "Success" ]; then
+              echo "Deployment completed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ]; then
+              echo "Deployment failed with status: $STATUS"
+              # Get error output
+              aws ssm list-command-invocations \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --region "$REGION" \
+                --details \
+                --query "CommandInvocations[0].CommandPlugins[0].Output" \
+                --output text
+              exit 1
+            fi
+            echo "Waiting for deployment... attempt $i"
+          done
 
-      - name: Verify deployment health
+      - name: Health Check
         run: |
-          echo "Checking application health..."
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 http://65.0.253.152/api/auth/login || echo "failed")
-          echo "HTTP Status: $HTTP_STATUS"
-          if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "400" ] || [ "$HTTP_STATUS" = "401" ] || [ "$HTTP_STATUS" = "405" ]; then
-            echo "Application is responding (expected status for API endpoint)"
-          elif [ "$HTTP_STATUS" = "failed" ]; then
-            echo "ERROR: Application health check failed"
-            exit 1
-          else
-            echo "Application is responding with status $HTTP_STATUS"
-          fi
+          echo "Checking health at ${{ env.PUBLIC_URL }}"
+          for i in $(seq 1 30); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.PUBLIC_URL }}" || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Health check passed - HTTP 200"
+              exit 0
+            fi
+            echo "Waiting for service... attempt $i (HTTP $HTTP_CODE)"
+            sleep 10
+          done
+          echo "Health check failed after 30 attempts"
+          curl -v "${{ env.PUBLIC_URL }}" 2>&1 || true
+          exit 1
