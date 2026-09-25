@@ -1,4 +1,4 @@
-name: Build and Deploy to EC2
+name: Deploy to EC2
 
 on:
   push:
@@ -6,12 +6,11 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: ap-south-1
+  REGION: ap-south-1
   ECR_REGISTRY: 759204735992.dkr.ecr.ap-south-1.amazonaws.com
   ECR_REPOSITORY: taskplanet
   INSTANCE_ID: i-0c56eb2e4cbe15fca
-  CONTAINER_PORT: 80
-  APP_NAME: app
+  DOCKERFILE_PATH: "."
 
 jobs:
   build-and-deploy:
@@ -23,61 +22,65 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Configure AWS credentials
+      - name: Install AWS CLI
         run: |
-          mkdir -p ~/.aws
-          cat > ~/.aws/credentials << EOF
-          [default]
-          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          EOF
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq awscli
+          aws --version
+
+      - name: Configure AWS credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-south-1
+        run: |
+          aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+          aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+          aws configure set region "$AWS_DEFAULT_REGION"
 
       - name: Login to Amazon ECR
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+          aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-      - name: Build and push Docker image
+      - name: Build and tag Docker image
         run: |
-          IMAGE_TAG="${{ github.sha }}-$(date +%s)"
+          IMAGE_TAG=${{ github.sha }}
+          docker build -f $DOCKERFILE_PATH -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-          docker build -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG .
-          docker tag ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
-          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
-          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
 
-      - name: Fetch secrets from AWS Secrets Manager
+      - name: Push Docker image to ECR
         run: |
-          SECRETS=$(aws secretsmanager get-secret-value --secret-id deptic/TaskPlanet/secrets --region ${{ env.AWS_REGION }} --query SecretString --output text)
-          echo "$SECRETS" > /tmp/app-secrets.json
-          echo "Secrets fetched successfully"
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ env.IMAGE_TAG }}
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Retrieve secrets from AWS Secrets Manager
+        id: secrets
+        run: |
+          SECRETS_JSON=$(aws secretsmanager get-secret-value --secret-id deptic/TaskPlanet/secrets --region $REGION --query SecretString --output text)
+          echo "$SECRETS_JSON" > /tmp/secrets.json
 
       - name: Deploy to EC2 via SSM
         run: |
-          REGION="${{ env.AWS_REGION }}"
-          ECR_REGISTRY="${{ env.ECR_REGISTRY }}"
-          ECR_REPOSITORY="${{ env.ECR_REPOSITORY }}"
-          IMAGE_TAG="${{ env.IMAGE_TAG }}"
-          INSTANCE_ID="${{ env.INSTANCE_ID }}"
-          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
+          # Create SSM document content inline
           cat > /tmp/ssm-params.json << 'SSMPARAMS'
           {
             "commands": [
               "aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REGISTRY",
-              "docker pull $IMAGE_URI",
-              "docker stop $APP_NAME || true",
-              "docker rm $APP_NAME || true",
-              "docker run -d --restart always -p $CONTAINER_PORT:$CONTAINER_PORT --name $APP_NAME $IMAGE_URI"
+              "docker pull $FULL_IMAGE",
+              "docker stop app || true",
+              "docker rm app || true",
+              "docker run -d --restart always -p 80:80 --name app $FULL_IMAGE"
             ]
           }
           SSMPARAMS
 
-          # Replace variables inside the JSON file
-          sed -i "s|\$REGION|$REGION|g" /tmp/ssm-params.json
-          sed -i "s|\$ECR_REGISTRY|$ECR_REGISTRY|g" /tmp/ssm-params.json
-          sed -i "s|\$IMAGE_URI|$IMAGE_URI|g" /tmp/ssm-params.json
-          sed -i "s|\$APP_NAME|${{ env.APP_NAME }}|g" /tmp/ssm-params.json
-          sed -i "s|\$CONTAINER_PORT|${{ env.CONTAINER_PORT }}|g" /tmp/ssm-params.json
+          # Substitute variables
+          sed -i "s|\$REGION|$REGION|g; s|\$ECR_REGISTRY|$ECR_REGISTRY|g; s|\$FULL_IMAGE|$FULL_IMAGE|g" /tmp/ssm-params.json
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
@@ -90,26 +93,42 @@ jobs:
           echo "SSM Command ID: $COMMAND_ID"
 
           # Wait for command to complete
-          sleep 10
-          aws ssm wait command-executed \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID" \
-            --region "$REGION"
+          for i in $(seq 1 30); do
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region "$REGION" \
+              --query "CommandInvocations[0].Status" \
+              --output text)
 
-          echo "Deployment completed successfully"
+            if [ "$STATUS" = "Success" ]; then
+              echo "Deployment completed successfully"
+              exit 0
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ] || [ "$STATUS" = "Cancelled" ]; then
+              echo "Deployment failed with status: $STATUS"
+              aws ssm list-command-invocations --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --region "$REGION" --details --query "CommandInvocations[0].CommandPlugins[0].Output" --output text
+              exit 1
+            fi
+            sleep 10
+          done
+
+          echo "Command timed out waiting for completion"
+          exit 1
 
       - name: Health check
         run: |
-          PUBLIC_URL="http://65.0.253.152"
-          echo "Checking health at $PUBLIC_URL"
-          for i in $(seq 1 30); do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$PUBLIC_URL" || echo "000")
+          MAX_RETRIES=12
+          RETRY_DELAY=10
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://65.0.253.152 || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "Health check passed! (HTTP $HTTP_CODE)"
+              echo "Health check passed - HTTP 200"
               exit 0
             fi
-            echo "Attempt $i: HTTP $HTTP_CODE - waiting..."
-            sleep 5
+            echo "Attempt $i/$MAX_RETRIES - HTTP status: $HTTP_CODE"
+            sleep $RETRY_DELAY
           done
-          echo "Health check failed after 30 attempts"
+
+          echo "Health check failed after $MAX_RETRIES attempts"
           exit 1
